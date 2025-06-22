@@ -1,6 +1,6 @@
 # Racing Drone Simulator
 
-A Python-based racing drone flight simulator that outputs position and orientation data via DMX protocols (sACN/Art-Net) for integration with lighting visualization software including Depence, Unreal Engine, and other virtual environments.
+A Python-based racing drone flight simulator that outputs position and orientation data via DMX protocols (sACN only for now) for integration with lighting visualization software including Depence, Unreal Engine, and other virtual environments.
 
 ## Features
 
