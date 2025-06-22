@@ -2,6 +2,7 @@ import pygame
 import numpy as np
 import sacn
 import sys
+import argparse
 from dataclasses import dataclass
 from typing import Tuple, Optional
 import math
@@ -133,7 +134,7 @@ class HorizontalSlider:
 
 
 class DroneSim:
-    def __init__(self):
+    def __init__(self, universe: int = 1, dmx_address: int = 1):
         pygame.init()
         self.screen = pygame.display.set_mode((1280, 720))
         pygame.display.set_caption("Racing Drone Simulator - sACN Output")
@@ -150,7 +151,8 @@ class DroneSim:
         self.fov_slider = HorizontalSlider(440, 640, 400, 20, 30, 120, self.drone.fov)
         
         # sACN setup
-        self.sacn_universe = 1
+        self.sacn_universe = universe
+        self.dmx_address = dmx_address - 1  # Convert to 0-based index for array
         self.sacn_sender = sacn.sACNsender()
         self.sacn_sender.start()
         self.sacn_sender.activate_output(self.sacn_universe)
@@ -313,23 +315,24 @@ class DroneSim:
         tilt_dmx = int(((self.drone.tilt + 90) / 180.0) * 65535)  # -90 to +90 -> 0 to 180
         roll_dmx = int(((self.drone.roll + 90) / 180.0) * 65535)  # -90 to +90 -> 0 to 180
         
-        # Set DMX channels (1-indexed in the spec, 0-indexed in array)
-        dmx_data[0] = x_dmx >> 8  # X MSB
-        dmx_data[1] = x_dmx & 0xFF  # X LSB
-        dmx_data[2] = y_dmx >> 8  # Y MSB
-        dmx_data[3] = y_dmx & 0xFF  # Y LSB
-        dmx_data[4] = z_dmx >> 8  # Z MSB
-        dmx_data[5] = z_dmx & 0xFF  # Z LSB
-        dmx_data[6] = pan_dmx >> 8  # Pan MSB
-        dmx_data[7] = pan_dmx & 0xFF  # Pan LSB
-        dmx_data[8] = tilt_dmx >> 8  # Tilt MSB
-        dmx_data[9] = tilt_dmx & 0xFF  # Tilt LSB
-        dmx_data[10] = roll_dmx >> 8  # Roll MSB
-        dmx_data[11] = roll_dmx & 0xFF  # Roll LSB
+        # Set DMX channels (using dmx_address as offset)
+        base = self.dmx_address
+        dmx_data[base + 0] = x_dmx >> 8  # X MSB
+        dmx_data[base + 1] = x_dmx & 0xFF  # X LSB
+        dmx_data[base + 2] = y_dmx >> 8  # Y MSB
+        dmx_data[base + 3] = y_dmx & 0xFF  # Y LSB
+        dmx_data[base + 4] = z_dmx >> 8  # Z MSB
+        dmx_data[base + 5] = z_dmx & 0xFF  # Z LSB
+        dmx_data[base + 6] = pan_dmx >> 8  # Pan MSB
+        dmx_data[base + 7] = pan_dmx & 0xFF  # Pan LSB
+        dmx_data[base + 8] = tilt_dmx >> 8  # Tilt MSB
+        dmx_data[base + 9] = tilt_dmx & 0xFF  # Tilt LSB
+        dmx_data[base + 10] = roll_dmx >> 8  # Roll MSB
+        dmx_data[base + 11] = roll_dmx & 0xFF  # Roll LSB
         
         # FOV (8-bit value)
         fov_dmx = int((self.drone.fov - 30) / 90.0 * 255)  # 30-120 degrees -> 0-255
-        dmx_data[12] = fov_dmx
+        dmx_data[base + 12] = fov_dmx
         
         # Send data
         self.sacn_sender[self.sacn_universe].dmx_data = dmx_data
@@ -392,7 +395,7 @@ class DroneSim:
             f"Velocity: X={self.drone.vx:.1f}m/s Y={self.drone.vy:.1f}m/s Z={self.drone.vz:.1f}m/s",
             f"Orientation: Pan={self.drone.pan:.0f}° Tilt={self.drone.tilt:.0f}° Roll={self.drone.roll:.0f}° FOV={self.drone.fov:.0f}°",
             f"Controls: Throttle={self.drone.throttle:.2f} Yaw={self.drone.yaw:.2f} Pitch={self.drone.pitch:.2f} Roll={self.drone.roll_input:.2f}",
-            f"sACN: Universe {self.sacn_universe} - Multicast",
+            f"sACN: Universe {self.sacn_universe} @ Ch{self.dmx_address + 1}-{self.dmx_address + 13} - Multicast",
             f"Controller: {'Gamepad' if self.gamepad else 'Virtual Joysticks'}"
         ]
         
@@ -435,7 +438,23 @@ class DroneSim:
 
 
 def main():
-    sim = DroneSim()
+    parser = argparse.ArgumentParser(description="Racing Drone Simulator with sACN Output")
+    parser.add_argument(
+        "--dmx-universe",
+        type=int,
+        default=1,
+        help="DMX universe number (default: 1)"
+    )
+    parser.add_argument(
+        "--dmx-address",
+        type=int,
+        default=1,
+        help="Starting DMX address for drone data (default: 1)"
+    )
+    
+    args = parser.parse_args()
+    
+    sim = DroneSim(universe=args.dmx_universe, dmx_address=args.dmx_address)
     sim.run()
 
 
