@@ -26,7 +26,7 @@ A Python-based racing drone flight simulator that outputs position and orientati
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/ANTIFRAGILE-Stadium/racing-drone-simulation
 cd racing-drone-simulation
 
 # Install dependencies with uv
