@@ -84,7 +84,7 @@ class DroneSim:
         )
         
         # Update physics
-        self.physics.update_physics(self.drone, dt)
+        self.physics.update_physics(self.drone, self.stage, dt)
         
         # Send DMX data
         self.dmx_controller.send_dmx_data(self.drone, self.stage)

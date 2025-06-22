@@ -6,7 +6,7 @@ Handles drone movement, physics calculations, and realistic flight dynamics.
 
 import math
 import numpy as np
-from .models import DroneState
+from .models import DroneState, StageConfig
 
 
 class DronePhysics:
@@ -21,12 +21,13 @@ class DronePhysics:
     YAW_ACCELERATION = 360.0 # deg/s^2 (yaw acceleration)
     DRAG_COEFFICIENT = 3.0   # Air resistance factor
     
-    def update_physics(self, drone: DroneState, dt: float) -> None:
+    def update_physics(self, drone: DroneState, stage: StageConfig, dt: float) -> None:
         """
         Update drone physics for one timestep.
         
         Args:
             drone: DroneState object to update
+            stage: StageConfig for bounds checking
             dt: Time delta in seconds
         """
         # Transform roll/pitch inputs relative to drone's current heading
@@ -75,6 +76,32 @@ class DronePhysics:
         
         # Normalize pan to 0-360
         drone.pan = drone.pan % 360
+        
+        # Apply stage bounds (cube: -size/2 to +size/2 for X/Y, 0 to size for Z)
+        half_size = stage.size / 2
+        
+        # X and Y bounds (horizontal)
+        if drone.x > half_size:
+            drone.x = half_size
+            drone.vx = min(0, drone.vx)  # Only allow movement back into bounds
+        elif drone.x < -half_size:
+            drone.x = -half_size
+            drone.vx = max(0, drone.vx)  # Only allow movement back into bounds
+            
+        if drone.y > half_size:
+            drone.y = half_size
+            drone.vy = min(0, drone.vy)  # Only allow movement back into bounds
+        elif drone.y < -half_size:
+            drone.y = -half_size
+            drone.vy = max(0, drone.vy)  # Only allow movement back into bounds
+        
+        # Z bounds (vertical: 0 to stage.size)
+        if drone.z > stage.size:
+            drone.z = stage.size
+            drone.vz = min(0, drone.vz)  # Only allow downward movement
+        elif drone.z < 0:
+            drone.z = 0
+            drone.vz = max(0, drone.vz)  # Only allow upward movement
     
     def emergency_stop(self, drone: DroneState) -> None:
         """Immediately stop all drone movement."""
