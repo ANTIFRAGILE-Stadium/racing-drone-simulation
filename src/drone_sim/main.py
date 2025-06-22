@@ -348,8 +348,17 @@ class DroneSim:
     
     def draw_drone(self):
         # Convert stage coordinates to screen coordinates
-        screen_x = int((self.drone.x / self.stage.size) * 800) + 240
-        screen_y = int((1 - self.drone.y / self.stage.size) * 400) + 20
+        # Map to square grid (400x400 centered at 440,220)
+        stage_size = 400
+        stage_x = 440
+        stage_y = 220
+        
+        # Normalize coordinates from -stage.size/2 to +stage.size/2 range to 0-1
+        normalized_x = (self.drone.x + self.stage.size/2) / self.stage.size
+        normalized_y = (self.drone.y + self.stage.size/2) / self.stage.size
+        
+        screen_x = int(stage_x - stage_size//2 + normalized_x * stage_size)
+        screen_y = int(stage_y - stage_size//2 + (1 - normalized_y) * stage_size)
         
         # Draw drone as circle with size based on height
         size = int(20 + (self.drone.z / self.stage.size) * 20)
@@ -364,17 +373,23 @@ class DroneSim:
         # Clear screen
         self.screen.fill((30, 30, 30))
         
-        # Draw stage bounds
-        stage_rect = pygame.Rect(240, 20, 800, 400)
+        # Draw stage bounds (square)
+        stage_size = 400  # Square size in pixels
+        stage_x = 440     # Center X position  
+        stage_y = 220     # Center Y position
+        stage_rect = pygame.Rect(stage_x - stage_size//2, stage_y - stage_size//2, stage_size, stage_size)
         pygame.draw.rect(self.screen, (60, 60, 60), stage_rect, 2)
         
-        # Draw grid
-        for i in range(5):
-            x = 240 + i * 200
-            pygame.draw.line(self.screen, (40, 40, 40), (x, 20), (x, 420), 1)
-        for i in range(3):
-            y = 20 + i * 133
-            pygame.draw.line(self.screen, (40, 40, 40), (240, y), (1040, y), 1)
+        # Draw grid (square)
+        grid_divisions = 5
+        for i in range(grid_divisions + 1):
+            # Vertical lines
+            x = stage_x - stage_size//2 + i * (stage_size // grid_divisions)
+            pygame.draw.line(self.screen, (40, 40, 40), (x, stage_y - stage_size//2), (x, stage_y + stage_size//2), 1)
+            
+            # Horizontal lines  
+            y = stage_y - stage_size//2 + i * (stage_size // grid_divisions)
+            pygame.draw.line(self.screen, (40, 40, 40), (stage_x - stage_size//2, y), (stage_x + stage_size//2, y), 1)
         
         # Draw drone
         self.draw_drone()
