@@ -14,7 +14,7 @@ A Python-based racing drone flight simulator that outputs position and orientati
   - Channels 9-10: Rotation Y (16-bit)
   - Channels 11-12: Rotation Z (16-bit)
   - Channel 13: FOV (8-bit)
-- **Stage Coordinate System**: 20m x 15m x 8m virtual stage
+- **Stage Coordinate System**: 20m x 20m x 20m virtual cube
 - **FOV Control**: Interactive slider for field of view adjustment (30°-120°)
 - **Command Line Arguments**: Configurable DMX start address and universe
 - **Keyboard Controls**:
@@ -62,8 +62,8 @@ uv run drone-sim --dmx-address 100 --dmx-universe 2
 ## Technical Details
 
 ### Stage Coordinate System
-- **Dimensions**: 20m (width) × 15m (depth) × 8m (height)
-- **Origin**: Front-left corner at ground level
+- **Dimensions**: 20m × 20m × 20m cube
+- **Origin**: Center of cube at ground level
 - **Units**: Meters for position, degrees for rotation
 
 ### DMX Protocol

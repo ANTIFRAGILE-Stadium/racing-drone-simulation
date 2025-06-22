@@ -4,21 +4,25 @@ import sacn
 import sys
 import argparse
 from dataclasses import dataclass
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 import math
+
+
+# Depence coordinate system mapping
+# X = stage left/right (same)
+# Y = up/down (maps from Z)
+# Z = back/forth (maps from Y)
 
 
 @dataclass
 class StageConfig:
-    width: float = 20.0  # meters
-    depth: float = 15.0  # meters
-    height: float = 8.0  # meters
+    size: float = 20.0  # meters (cube dimensions)
     
     
 @dataclass
 class DroneState:
-    x: float = 10.0  # meters (center of stage)
-    y: float = 7.5   # meters (center of stage)
+    x: float = 0.0   # meters (center)
+    y: float = 0.0   # meters (center)
     z: float = 4.0   # meters (mid height)
     pan: float = 0.0  # degrees
     tilt: float = 0.0  # degrees
@@ -287,16 +291,7 @@ class DroneSim:
         self.drone.tilt = np.clip(self.drone.vy / MAX_SPEED_XY * 30.0, -30, 30)
         self.drone.roll = np.clip(self.drone.vx / MAX_SPEED_XY * 30.0, -30, 30)
         
-        # Clamp to stage bounds and apply bounce
-        if self.drone.x <= 0 or self.drone.x >= self.stage.width:
-            self.drone.vx *= -0.5  # Bounce with energy loss
-            self.drone.x = np.clip(self.drone.x, 0, self.stage.width)
-        if self.drone.y <= 0 or self.drone.y >= self.stage.depth:
-            self.drone.vy *= -0.5
-            self.drone.y = np.clip(self.drone.y, 0, self.stage.depth)
-        if self.drone.z <= 0 or self.drone.z >= self.stage.height:
-            self.drone.vz *= -0.5
-            self.drone.z = np.clip(self.drone.z, 0, self.stage.height)
+        # No bounds - drone can move freely in all directions
         
         # Normalize pan to 0-360
         self.drone.pan = self.drone.pan % 360
@@ -305,15 +300,26 @@ class DroneSim:
         # Convert to DMX values (0-65535 for 16-bit)
         dmx_data = [0] * 512
         
-        # Position (16-bit values)
-        x_dmx = int((self.drone.x / self.stage.width) * 65535)
-        y_dmx = int((self.drone.y / self.stage.depth) * 65535)
-        z_dmx = int((self.drone.z / self.stage.height) * 65535)
+        # Position mapping for Depence: X=left/right, Y=up/down, Z=back/forth
+        # Normalize to 0-1 range using stage size as reference (but no bounds enforcement)
+        x_norm = (self.drone.x + self.stage.size/2) / self.stage.size    # Center at stage center
+        y_norm = self.drone.z / self.stage.size                          # 0 = ground, 1 = top
+        z_norm = (self.drone.y + self.stage.size/2) / self.stage.size    # Center at stage center
         
-        # Orientation (16-bit values)
-        pan_dmx = int((self.drone.pan / 360.0) * 65535)
-        tilt_dmx = int(((self.drone.tilt + 90) / 180.0) * 65535)  # -90 to +90 -> 0 to 180
-        roll_dmx = int(((self.drone.roll + 90) / 180.0) * 65535)  # -90 to +90 -> 0 to 180
+        # Clamp to 0-1 for DMX output only
+        x_norm = max(0, min(1, x_norm))
+        y_norm = max(0, min(1, y_norm))
+        z_norm = max(0, min(1, z_norm))
+        
+        x_dmx = int(x_norm * 65535)      # X -> X (stage left/right)
+        y_dmx = int(y_norm * 65535)      # Z -> Y (up/down)
+        z_dmx = int(z_norm * 65535)      # Y -> Z (back/forth)
+        
+        # Orientation (16-bit values) - swapped for Depence
+        # In Depence: Pan and Tilt are swapped
+        pan_dmx = int(((self.drone.tilt + 90) / 180.0) * 65535)    # Tilt -> Pan (swapped)
+        tilt_dmx = int((self.drone.pan / 360.0) * 65535)           # Pan -> Tilt (swapped)
+        roll_dmx = int(((self.drone.roll + 180) / 360.0) * 65535)  # Roll + 180° to fix upside down
         
         # Set DMX channels (using dmx_address as offset)
         base = self.dmx_address
@@ -342,11 +348,11 @@ class DroneSim:
     
     def draw_drone(self):
         # Convert stage coordinates to screen coordinates
-        screen_x = int((self.drone.x / self.stage.width) * 800) + 240
-        screen_y = int((1 - self.drone.y / self.stage.depth) * 400) + 20
+        screen_x = int((self.drone.x / self.stage.size) * 800) + 240
+        screen_y = int((1 - self.drone.y / self.stage.size) * 400) + 20
         
         # Draw drone as circle with size based on height
-        size = int(20 + (self.drone.z / self.stage.height) * 20)
+        size = int(20 + (self.drone.z / self.stage.size) * 20)
         pygame.draw.circle(self.screen, (255, 100, 100), (screen_x, screen_y), size)
         
         # Draw direction indicator
@@ -396,6 +402,7 @@ class DroneSim:
             f"Orientation: Pan={self.drone.pan:.0f}° Tilt={self.drone.tilt:.0f}° Roll={self.drone.roll:.0f}° FOV={self.drone.fov:.0f}°",
             f"Controls: Throttle={self.drone.throttle:.2f} Yaw={self.drone.yaw:.2f} Pitch={self.drone.pitch:.2f} Roll={self.drone.roll_input:.2f}",
             f"sACN: Universe {self.sacn_universe} @ Ch{self.dmx_address + 1}-{self.dmx_address + 13} - Multicast",
+            f"Coordinate System: DEPENCE (X=L/R, Y=U/D, Z=B/F)",
             f"Controller: {'Gamepad' if self.gamepad else 'Virtual Joysticks'}"
         ]
         
@@ -404,14 +411,15 @@ class DroneSim:
             self.screen.blit(text, (240, y_pos))
             y_pos += 30
         
-        # Draw controls help
+        # Draw controls help            
         help_text = [
-            "ESC: Quit | SPACE: Emergency Stop | R: Reset Position"
+            "ESC: Quit | SPACE: Emergency Stop | R: Reset Position",
+            "DMX Output: X=Stage L/R, Y=Up/Down, Z=Back/Forth, Pan/Tilt swapped for Depence"
         ]
         y_pos = 680
         for line in help_text:
             text = self.font_small.render(line, True, (120, 120, 120))
-            self.screen.blit(text, (440, y_pos))
+            self.screen.blit(text, (240, y_pos))
             y_pos += 20
         
         # Draw sACN indicator
@@ -438,7 +446,7 @@ class DroneSim:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Racing Drone Simulator with sACN Output")
+    parser = argparse.ArgumentParser(description="Racing Drone Simulator with sACN Output (Depence format)")
     parser.add_argument(
         "--dmx-universe",
         type=int,
