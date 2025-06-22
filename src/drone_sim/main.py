@@ -161,17 +161,34 @@ class DroneSim:
         self.font_small = pygame.font.Font(None, 18)
         
         # Gamepad
-        pygame.joystick.init()
         self.gamepad = None
-        if pygame.joystick.get_count() > 0:
-            self.gamepad = pygame.joystick.Joystick(0)
-            self.gamepad.init()
+        try:
+            pygame.joystick.init()
+            if pygame.joystick.get_count() > 0:
+                self.gamepad = pygame.joystick.Joystick(0)
+                self.gamepad.init()
+                print(f"Connected to controller: {self.gamepad.get_name()}")
+        except Exception as e:
+            print(f"Controller initialization failed: {e}")
+            print("Continuing with virtual joysticks...")
+            self.gamepad = None
         
         self.running = True
         self.emergency_stop = False
         
     def handle_events(self):
-        for event in pygame.event.get():
+        try:
+            events = pygame.event.get()
+        except (SystemError, pygame.error) as e:
+            # Controller disconnection can cause pygame.event.get() to fail
+            print(f"Event handling error (likely controller issue): {e}")
+            # Try to reset controller
+            self.gamepad = None
+            # Clear event queue a different way
+            pygame.event.clear()
+            return
+            
+        for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.KEYDOWN:
@@ -208,11 +225,15 @@ class DroneSim:
             return
         
         if self.gamepad:
-            # Use physical gamepad
-            self.drone.yaw = self.gamepad.get_axis(0)  # Left stick X
-            self.drone.throttle = -self.gamepad.get_axis(1)  # Left stick Y (inverted)
-            self.drone.roll_input = self.gamepad.get_axis(2)  # Right stick X
-            self.drone.pitch = -self.gamepad.get_axis(3)  # Right stick Y (inverted)
+            try:
+                # Use physical gamepad
+                self.drone.yaw = self.gamepad.get_axis(0)  # Left stick X
+                self.drone.throttle = -self.gamepad.get_axis(1)  # Left stick Y (inverted)
+                self.drone.roll_input = self.gamepad.get_axis(2)  # Right stick X
+                self.drone.pitch = -self.gamepad.get_axis(3)  # Right stick Y (inverted)
+            except (pygame.error, SystemError) as e:
+                print(f"Controller read error: {e}")
+                self.gamepad = None
         else:
             # Use virtual joysticks
             yaw, throttle = self.left_stick.get_values()
