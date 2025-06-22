@@ -4,23 +4,23 @@ A Python-based racing drone flight simulator that outputs position and orientati
 
 ## Features
 
-- **Virtual Joysticks**: On-screen controls for development (automatically switches to gamepad when connected)
-- **Real-time sACN Output**: Streams DMX data that can be received by lighting consoles like grandMA3 or Depence
-- **13-channel DMX Mapping** (compatible with Depence camera channels):
-  - Channels 1-2: X Position (16-bit)
-  - Channels 3-4: Y Position (16-bit)
-  - Channels 5-6: Z Position (16-bit)
-  - Channels 7-8: Rotation X (16-bit)
-  - Channels 9-10: Rotation Y (16-bit)
-  - Channels 11-12: Rotation Z (16-bit)
-  - Channel 13: FOV (8-bit)
-- **Stage Coordinate System**: 20m x 20m x 20m virtual cube
-- **FOV Control**: Interactive slider for field of view adjustment (30°-120°)
-- **Command Line Arguments**: Configurable DMX start address and universe
-- **Keyboard Controls**:
-  - ESC: Quit
-  - SPACE: Emergency Stop
-  - R: Reset Position
+- **Realistic Flight Physics**: Orientation-relative controls with realistic banking effects
+- **Gamepad Support**: Auto-detects PS4/Xbox controllers with fallback to virtual joysticks
+- **Real-time sACN Output**: Streams DMX data compatible with Depence and other lighting software
+- **14-channel DMX Mapping** (Depence coordinate system):
+  - Channels 1-2: X Position (16-bit) - Stage Left/Right
+  - Channels 3-4: Y Position (16-bit) - Up/Down (maps from Z)
+  - Channels 5-6: Z Position (16-bit) - Back/Forth (maps from Y)
+  - Channels 7-8: Pan (16-bit) - Swapped with Tilt for Depence
+  - Channels 9-10: Tilt (16-bit) - Swapped with Pan for Depence
+  - Channels 11-12: Roll (16-bit)
+  - Channels 13-14: Zoom/FOV (16-bit)
+- **Square Grid Visualization**: Accurate representation of 20m cube stage
+- **Modular Architecture**: Clean separation of physics, rendering, controls, and DMX output
+- **Interactive Controls**:
+  - FOV slider (30°-120°)
+  - Emergency stop and position reset
+  - Real-time status display
 
 ## Installation
 
@@ -74,12 +74,23 @@ uv run drone-sim --dmx-address 100 --dmx-universe 2
 
 ## Development
 
-Project structure:
-- `main.py`: Command-line interface and argument parsing
-- `src/drone_sim/main.py`: Core simulator application
-- Uses pygame for graphics and input handling
-- Uses sacn library for DMX streaming
-- Modular design for easy extension and integration
+### Project Structure
+```
+src/drone_sim/
+├── main.py         # Main application orchestration
+├── models.py       # Data structures (DroneState, StageConfig)
+├── physics.py      # Physics engine and drone movement
+├── ui.py          # UI components (joysticks, sliders)
+├── controls.py    # Input handling (gamepad, keyboard)
+├── rendering.py   # Visualization and drawing
+└── dmx.py         # DMX/sACN output handling
+```
+
+### Key Features
+- **Modular Design**: Each component has a single responsibility
+- **Type Safety**: Full type hints throughout the codebase
+- **Real-time Performance**: 60 FPS physics and rendering
+- **Cross-platform**: Works on Windows, macOS, and Linux
 
 ## Requirements
 
