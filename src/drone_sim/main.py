@@ -260,8 +260,16 @@ class DroneSim:
         DRAG_COEFFICIENT = 3.0  # Higher = more drag
         
         # Calculate desired velocities based on stick input
-        desired_vx = self.drone.roll_input * MAX_SPEED_XY
-        desired_vy = self.drone.pitch * MAX_SPEED_XY
+        # Transform roll/pitch inputs relative to drone's current heading
+        pan_rad = math.radians(self.drone.pan)
+        
+        # Roll and pitch relative to drone's orientation
+        drone_forward = -self.drone.pitch * MAX_SPEED_XY  # Invert for correct direction
+        drone_right = -self.drone.roll_input * MAX_SPEED_XY  # Invert for correct direction
+        
+        # Transform to world coordinates
+        desired_vx = drone_right * math.cos(pan_rad) - drone_forward * math.sin(pan_rad)
+        desired_vy = drone_right * math.sin(pan_rad) + drone_forward * math.cos(pan_rad)
         desired_vz = self.drone.throttle * MAX_SPEED_Z
         desired_v_yaw = self.drone.yaw * MAX_YAW_RATE
         
@@ -288,8 +296,12 @@ class DroneSim:
         self.drone.pan += self.drone.v_yaw * dt
         
         # Update tilt and roll based on velocity (banking effect)
-        self.drone.tilt = np.clip(self.drone.vy / MAX_SPEED_XY * 30.0, -30, 30)
-        self.drone.roll = np.clip(self.drone.vx / MAX_SPEED_XY * 30.0, -30, 30)
+        # Tilt: drone-relative forward velocity, Roll: world X velocity
+        pan_rad = math.radians(self.drone.pan)
+        drone_forward_vel = -self.drone.vx * math.sin(pan_rad) + self.drone.vy * math.cos(pan_rad)
+        
+        self.drone.tilt = np.clip(-drone_forward_vel / MAX_SPEED_XY * 30.0, -30, 30)  # Forward motion = nose down
+        self.drone.roll = np.clip(-self.drone.vx / MAX_SPEED_XY * 30.0, -30, 30)   # Right motion = roll right
         
         # No bounds - drone can move freely in all directions
         
